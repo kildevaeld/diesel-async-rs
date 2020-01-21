@@ -9,10 +9,10 @@ edition = "2018"
 [dependencies]
 diesel = { version = "1.4", features = [ "r2d2" ] }
 r2d2 = "0.8"
-failure = "0.1"
 futures-channel = { version = "0.3" }
 rayon = "1"
 pin-project = "0.4"
+workerpool = "1.2"
 
 
 [features]

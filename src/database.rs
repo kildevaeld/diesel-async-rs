@@ -37,16 +37,13 @@ where
     C: Connection,
 {
     pub fn new(pool: Pool<ConnectionManager<C>>) -> Database<C> {
-        Database {
-            pool,
-            tp: Arc::new(ThreadPoolBuilder::new().build().unwrap()),
-        }
+        Database::new_with_threadpool(pool, Arc::new(ThreadPoolBuilder::new().build().unwrap()))
     }
 
-    pub fn new_with_threads(pool: Pool<ConnectionManager<C>>, num: usize) -> Database<C> {
+    pub fn new_with_threadpool(pool: Pool<ConnectionManager<C>>, threadpool: Arc<ThreadPool>) -> Database<C> {
         Database {
             pool,
-            tp: Arc::new(ThreadPoolBuilder::new().num_threads(num).build().unwrap()),
+            tp: threadpool
         }
     }
 
@@ -73,7 +70,7 @@ where
     where
         F: 'static + (FnOnce(&C) -> Result<R, E>) + Send,
         R: 'static + Send,
-        E: 'static + From<diesel::result::Error> + Debug + Send + Sync, // + From<TaskError>,
+        E: 'static + From<diesel::result::Error> + std::error::Error + Send + Sync, // + From<TaskError>,
     {
         self.get(move |conn| conn.transaction(|| f(&conn)))
     }
@@ -85,12 +82,13 @@ where
     where
         F: 'static + Send + FnOnce(&C) -> Result<R, E>,
         R: 'static + Send,
-        E: 'static + Debug + Send + Sync,
+        E: 'static + std::error::Error + Send + Sync,
     {
         let (sx, rx) = channel();
 
         let pool = self.pool.clone();
 
+        
         self.tp.install(move || {
             let out = match pool.get() {
                 Ok(conn) => f(&conn).map_err(|e| AsyncError::Execute(e)),
