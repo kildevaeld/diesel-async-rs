@@ -46,7 +46,7 @@ where
     pub fn new_with_threads(pool: Pool<ConnectionManager<C>>, num: usize) -> Database<C> {
         Database {
             pool,
-            tp: Arc::new(ThreadPoolBuilder::new().num_threads(num).build().unwrap())
+            tp: Arc::new(ThreadPoolBuilder::new().num_threads(num).build().unwrap()),
         }
     }
 
@@ -97,7 +97,9 @@ where
                 Err(e) => Err(AsyncError::Timeout(e)),
             };
 
-            if let Err(_) = sx.send(out) {}
+            if let Err(_) = sx.send(out) {
+                // Ignore send error?
+            }
         });
 
         ChannelReceiverFuture::new(rx)
