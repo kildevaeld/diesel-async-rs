@@ -87,46 +87,32 @@ where
         R: 'static + Send,
         E: 'static + std::error::Error + Send + Sync,
     {
-        // let (sx, rx) = channel();
-
-        // let pool = self.pool.clone();
-
-        // self.tp.execute(move || {
-            // let out = match pool.get() {
-            //     Ok(conn) => f(&conn).map_err(|e| AsyncError::Execute(e)),
-            //     Err(e) => Err(AsyncError::Timeout(e)),
-            // };
-
-            // if let Err(_) = sx.send(out) {
-            //     // Ignore send error?
-            // }
-        // });
-
-        // ChannelReceiverFuture::new(rx)
         let pool = self.pool.clone();
         spawn_on_thread(&self.tp, move || {
             match pool.get() {
                 Ok(conn) => f(&conn).map_err(|e| AsyncError::Execute(e)),
                 Err(e) => Err(AsyncError::Timeout(e)),
             }  
-        })
+        }, |_| {})
     }
 }
 
-pub fn spawn_on_thread<F, R, E>(
+pub fn spawn_on_thread<F, C, R, E>(
     thread: &ThreadPool,
     f: F,
+    ocb: C,
 ) -> impl Future<Output = Result<R, E>>
 where
     F: (FnOnce() -> Result<R, E>) + Send + 'static,
+    C: FnOnce(Result<R, E>) + Send + 'static,
     R: 'static + Send,
     E: 'static + From<Canceled> + Send + Sync,
 {
     let (sx, rx) = channel();
     thread.execute(move|| {
         let ret = f();
-        if let Err(_) = sx.send(ret) {
-            // Ignore send error?
+        if let Err(ret) = sx.send(ret) {
+            ocb(ret);
         }
     });
 
