@@ -40,10 +40,13 @@ where
         Database::new_with_threadpool(pool, ThreadPool::default())
     }
 
-    pub fn new_with_threadpool(pool: Pool<ConnectionManager<C>>, threadpool: ThreadPool) -> Database<C> {
+    pub fn new_with_threadpool(
+        pool: Pool<ConnectionManager<C>>,
+        threadpool: ThreadPool,
+    ) -> Database<C> {
         Database {
             pool,
-            tp: threadpool
+            tp: threadpool,
         }
     }
 
@@ -84,25 +87,50 @@ where
         R: 'static + Send,
         E: 'static + std::error::Error + Send + Sync,
     {
-        let (sx, rx) = channel();
+        // let (sx, rx) = channel();
 
+        // let pool = self.pool.clone();
+
+        // self.tp.execute(move || {
+            // let out = match pool.get() {
+            //     Ok(conn) => f(&conn).map_err(|e| AsyncError::Execute(e)),
+            //     Err(e) => Err(AsyncError::Timeout(e)),
+            // };
+
+            // if let Err(_) = sx.send(out) {
+            //     // Ignore send error?
+            // }
+        // });
+
+        // ChannelReceiverFuture::new(rx)
         let pool = self.pool.clone();
-
-
-        self.tp.execute(move || {
-            let out = match pool.get() {
+        spawn_on_thread(&self.tp, move || {
+            match pool.get() {
                 Ok(conn) => f(&conn).map_err(|e| AsyncError::Execute(e)),
                 Err(e) => Err(AsyncError::Timeout(e)),
-            };
-
-            if let Err(_) = sx.send(out) {
-                // Ignore send error?
-            }
-        });
-        
-
-        ChannelReceiverFuture::new(rx)
+            }  
+        })
     }
+}
+
+pub fn spawn_on_thread<F, R, E>(
+    thread: &ThreadPool,
+    f: F,
+) -> impl Future<Output = Result<R, E>>
+where
+    F: (FnOnce() -> Result<R, E>) + Send + 'static,
+    R: 'static + Send,
+    E: 'static + From<Canceled> + Send + Sync,
+{
+    let (sx, rx) = channel();
+    thread.execute(move|| {
+        let ret = f();
+        if let Err(_) = sx.send(ret) {
+            // Ignore send error?
+        }
+    });
+
+    ChannelReceiverFuture::new(rx)
 }
 
 #[pin_project]
