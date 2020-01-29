@@ -10,9 +10,8 @@ edition = "2018"
 diesel = { version = "1.4", features = [ "r2d2" ] }
 r2d2 = "0.8"
 futures-channel = { version = "0.3" }
-rayon = "1"
 pin-project = "0.4"
-workerpool = "1.2"
+threadpool = { git = "https://github.com/kildevaeld/rust-threadpool.git" }
 
 
 [features]

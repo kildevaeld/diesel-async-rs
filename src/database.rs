@@ -5,18 +5,18 @@ use diesel::{
 };
 use futures_channel::oneshot::{channel, Canceled, Receiver};
 use pin_project::pin_project;
-use rayon::{ThreadPool, ThreadPoolBuilder};
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 use std::{fmt::Debug, marker::PhantomData};
+use threadpool::ThreadPool;
 
 pub struct Database<C: 'static>
 where
     C: Connection,
 {
-    pub(crate) tp: Arc<ThreadPool>,
+    pub(crate) tp: ThreadPool,
     pub(crate) pool: Pool<ConnectionManager<C>>,
 }
 
@@ -37,10 +37,10 @@ where
     C: Connection,
 {
     pub fn new(pool: Pool<ConnectionManager<C>>) -> Database<C> {
-        Database::new_with_threadpool(pool, Arc::new(ThreadPoolBuilder::new().build().unwrap()))
+        Database::new_with_threadpool(pool, ThreadPool::default())
     }
 
-    pub fn new_with_threadpool(pool: Pool<ConnectionManager<C>>, threadpool: Arc<ThreadPool>) -> Database<C> {
+    pub fn new_with_threadpool(pool: Pool<ConnectionManager<C>>, threadpool: ThreadPool) -> Database<C> {
         Database {
             pool,
             tp: threadpool
@@ -88,8 +88,8 @@ where
 
         let pool = self.pool.clone();
 
-        
-        self.tp.install(move || {
+
+        self.tp.execute(move || {
             let out = match pool.get() {
                 Ok(conn) => f(&conn).map_err(|e| AsyncError::Execute(e)),
                 Err(e) => Err(AsyncError::Timeout(e)),
@@ -99,6 +99,7 @@ where
                 // Ignore send error?
             }
         });
+        
 
         ChannelReceiverFuture::new(rx)
     }
