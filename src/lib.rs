@@ -1,3 +1,6 @@
+#[macro_use]
+extern crate diesel;
+
 mod builder;
 mod error;
 mod database;
