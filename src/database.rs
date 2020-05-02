@@ -4,12 +4,11 @@ use diesel::{
     Connection,
 };
 use futures_channel::oneshot::{channel, Canceled, Receiver};
-use pin_project::pin_project;
+use pin_project_lite::pin_project;
 use std::future::Future;
+use std::marker::PhantomData;
 use std::pin::Pin;
-use std::sync::Arc;
 use std::task::{Context, Poll};
-use std::{fmt::Debug, marker::PhantomData};
 use threadpool::ThreadPool;
 
 pub struct Database<C: 'static>
@@ -88,12 +87,14 @@ where
         E: 'static + std::error::Error + Send + Sync,
     {
         let pool = self.pool.clone();
-        spawn_on_thread(&self.tp, move || {
-            match pool.get() {
+        spawn_on_thread(
+            &self.tp,
+            move || match pool.get() {
                 Ok(conn) => f(&conn).map_err(|e| AsyncError::Execute(e)),
                 Err(e) => Err(AsyncError::Timeout(e)),
-            }  
-        }, |_| {})
+            },
+            |_| {},
+        )
     }
 }
 
@@ -109,7 +110,7 @@ where
     E: 'static + From<Canceled> + Send + Sync,
 {
     let (sx, rx) = channel();
-    thread.execute(move|| {
+    thread.execute(move || {
         let ret = f();
         if let Err(ret) = sx.send(ret) {
             ocb(ret);
@@ -119,10 +120,11 @@ where
     ChannelReceiverFuture::new(rx)
 }
 
-#[pin_project]
-pub struct ChannelReceiverFuture<O, E> {
-    #[pin]
-    rx: Receiver<Result<O, E>>,
+pin_project! {
+    pub struct ChannelReceiverFuture<O, E> {
+        #[pin]
+        rx: Receiver<Result<O, E>>,
+    }
 }
 
 impl<O, E> ChannelReceiverFuture<O, E> {
