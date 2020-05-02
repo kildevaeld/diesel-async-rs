@@ -8,6 +8,7 @@ use std::{
     marker::PhantomData,
     time::Duration,
 };
+use threadpool::ThreadPool;
 
 pub struct Builder<C: 'static>
 where
@@ -59,6 +60,14 @@ where
     }
 
     pub fn open(&mut self, url: impl Into<String>) -> Database<C> {
+        self.open_with_threadpool(url, ThreadPool::default())
+    }
+
+    pub fn open_with_threadpool(
+        &mut self,
+        url: impl Into<String>,
+        threadpool: ThreadPool,
+    ) -> Database<C> {
         let manager = ConnectionManager::<C>::new(url);
         let mut p = Pool::builder();
 
@@ -83,7 +92,7 @@ where
 
         let pool = p.build_unchecked(manager);
 
-        Database::new(pool)
+        Database::new_with_threadpool(pool, threadpool)
     }
 }
 
