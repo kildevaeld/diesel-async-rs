@@ -55,6 +55,11 @@ where
     }
 
     #[inline]
+    pub fn open_with(url: impl Into<String>, threadpool: ThreadPool) -> Database<C> {
+        Self::builder().open_with_threadpool(url, threadpool)
+    }
+
+    #[inline]
     pub fn builder() -> Builder<C> {
         Builder {
             phantom: PhantomData,
