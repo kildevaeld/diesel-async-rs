@@ -1,9 +1,11 @@
+use super::database::Database;
+use super::dsl::AsyncRunQueryDsl;
+use super::AsyncError;
 use diesel::pg::Pg;
 use diesel::prelude::*;
 use diesel::query_builder::*;
 use diesel::query_dsl::methods::LoadQuery;
 use diesel::sql_types::BigInt;
-
 
 pub trait Paginate: Sized {
     fn paginate(self, page: i64) -> Paginated<Self>;
@@ -39,6 +41,24 @@ impl<T> Paginated<T> {
     {
         let per_page = self.per_page;
         let results = self.load::<(U, i64)>(conn)?;
+        let total = results.get(0).map(|x| x.1).unwrap_or(0);
+        let records = results.into_iter().map(|x| x.0).collect();
+        let total_pages = (total as f64 / per_page as f64).ceil() as i64;
+        Ok((records, total_pages, total))
+    }
+
+    pub async fn load_and_count_pages_async<U>(
+        self,
+        conn: &Database<PgConnection>,
+    ) -> Result<(Vec<U>, i64, i64), AsyncError<diesel::result::Error>>
+    where
+        Self: LoadQuery<PgConnection, (U, i64)>,
+        Self: Send,
+        U: Send + 'static,
+        T: 'static,
+    {
+        let per_page = self.per_page;
+        let results = self.load_async::<(U, i64)>(conn).await?;
         let total = results.get(0).map(|x| x.1).unwrap_or(0);
         let records = results.into_iter().map(|x| x.0).collect();
         let total_pages = (total as f64 / per_page as f64).ceil() as i64;
