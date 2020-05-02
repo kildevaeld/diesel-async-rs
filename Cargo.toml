@@ -10,10 +10,10 @@ edition = "2018"
 diesel = { version = "1.4", features = [ "r2d2" ] }
 r2d2 = "0.8"
 futures-channel = { version = "0.3" }
-pin-project = "0.4"
-threadpool = { git = "https://github.com/kildevaeld/rust-threadpool.git" }
+pin-project-lite = "0.1"
+threadpool = { git = "https://github.com/kildevaeld/rust-threadpool.git", version = "1.8.0" }
 
 
 [features]
-default = []
+default = [ "pg" ]
 pg = ["diesel/postgres"]
